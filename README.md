@@ -27,16 +27,28 @@ echo CONFIG_IMAGEOPT=y >> .config
 echo CONFIG_PREINITOPT=y >> .config
 echo CONFIG_TARGET_PREINIT_DISABLE_FAILSAFE=y >> .config
 
-# Fill in the rest of the build config
+# Fill in the rest of the build config and start build
 make defconfig
-
-# Build it
 make
 
-# Copy kernel and rootfs
-cp -v build_dir/target-x86_64_musl/linux-x86_64/vmlinux.elf ../vmlinux.elf
-gunzip -c bin/targets/x86/64/openwrt-x86-64-generic-ext4-rootfs.img.gz > ../rootfs.img
+# We're done building OpenWrt, grab kernel and rootfs
+cd -
+cp -v openwrt/build_dir/target-x86_64_musl/linux-x86_64/vmlinux.elf ./vmlinux.elf
+gunzip -c openwrt/bin/targets/x86/64/openwrt-x86-64-generic-ext4-rootfs.img.gz > ./rootfs.img
 
-cd ..
+# Create network interface for communicating with guest (OpenWrt is 192.168.1.1)
+sudo ip tuntap add dev tap0 mode tap
+sudo ip addr add 192.168.1.2/24 dev tap0
+sudo ip link set dev tap0 up
+sudo sysctl -w net.ipv4.conf.tap0.proxy_arp=1
+
+# Start the VM
 sudo `which firecracker` --no-api --config-file ./vmconfig.json
+
+# Ping
+ping 192.168.1.1
+ssh root@192.168.1.1 ping 192.168.1.2
+
+# Kill the VM
+sudo killall firecracker
 ```
