@@ -1,54 +1,66 @@
 
 # OpenWrt as a Firecracker MicroVM
 
-Boots in less than 4 seconds.
+- Boots in less than 4-6 seconds. There are number of large sleeps in the OpenWrt boot process that can probably be avoided in a VM (no actual hardware to wait for).
+- Works with OpenWrt snapshots and not with OpenWrt 21.02, because the kernel needs to have `CONFIG_VIRTIO_MMIO_CMDLINE_DEVICES` enabled, which was added in October 2021.
+- Reboot and shutdown are wonky in Firecracker VMs. `poweroff` will halt the guest system but not exit the VM itself, `reboot` will exit the VM as you'd expect from `poweroff`. From the host's side, you can simply kill the Firecracker process for a non-graceful shutdown.
 
-Noteworthy:
-- Reboot and shutdown are wonky in Firecracker VMs. `poweroff` will halt the guest system but not exit the VM, `reboot` will exit the VM as you'd expect from `poweroff`. From the host's side, you can simply kill the Firecracker process for a non-graceful shutdown.
-- Kernel needs `CONFIG_VIRTIO_MMIO_CMDLINE_DEVICES=y` -- see https://github.com/openwrt/openwrt/pull/4666 and https://github.com/firecracker-microvm/firecracker/issues/2021#issuecomment-939302986
+## Basic usage
+
+OpenWrt automatically uses `eth0` for the `lan` bridge and `eth1` for `wan`/`wan6`. If the `eth` doesn't exist, it will simply skipped and only the `lan` bridge created.
+
+Get the kernel and rootfs images.
+```sh
+wget -O extract-vmlinux.sh https://github.com/torvalds/linux/raw/master/scripts/extract-vmlinux
+chmod +x extract-vmlinux.sh
+
+wget -O bzImage https://downloads.openwrt.org/snapshots/targets/x86/64/openwrt-x86-64-generic-kernel.bin
+./extract-vmlinux.sh bzImage > vmlinux.elf
+
+wget -O rootfs.img.gz https://downloads.openwrt.org/snapshots/targets/x86/64/openwrt-x86-64-generic-ext4-rootfs.img.gz
+gunzip rootfs.img.gz
+```
+
+Create host-side interfaces for the VM's eth0/lan and eth1/wan interfaces. The interface names must match what's specified in `vmconfig.json`.
+```sh
+sudo ip tuntap add dev tap0 mode tap
+sudo ip addr add 192.168.1.2/24 dev tap0 # could alternatively obtain DHCP lease
+sudo ip link set dev tap0 up
+
+sudo ip tuntap add dev tap1 mode tap
+sudo ip addr add 192.168.123.1/24 dev tap1
+sudo ip link set dev tap1 up
+```
+
+In a separate shell, start the VM. Note that changes to the ext4 rootfs partition are persistent. Other rootfs options (layered or ephemeral) haven't been evaluated yet.
 
 ```sh
-# Set up vanilla OpenWrt build environment
-git clone https://github.com/openwrt/openwrt
-cd openwrt/
-./scripts/feeds update -a
-./scripts/feeds install -a
-
-# Firecracker needs this
-echo CONFIG_VIRTIO_MMIO_CMDLINE_DEVICES=y >> target/linux/x86/64/config-5.10
-
-# Select x86_64 target
-echo CONFIG_TARGET_x86=y >> .config
-echo CONFIG_TARGET_x86_64=y >> .config
-echo CONFIG_TARGET_x86_64_DEVICE_generic=y >> .config
-
-# Skip the unneccessary 2 second wait for failsafe mode
-echo CONFIG_IMAGEOPT=y >> .config
-echo CONFIG_PREINITOPT=y >> .config
-echo CONFIG_TARGET_PREINIT_DISABLE_FAILSAFE=y >> .config
-
-# Fill in the rest of the build config and start build
-make defconfig
-make
-
-# We're done building OpenWrt, grab kernel and rootfs
-cd -
-cp -v openwrt/build_dir/target-x86_64_musl/linux-x86_64/vmlinux.elf ./vmlinux.elf
-gunzip -c openwrt/bin/targets/x86/64/openwrt-x86-64-generic-ext4-rootfs.img.gz > ./rootfs.img
-
-# Create network interface for communicating with guest (OpenWrt is 192.168.1.1)
-sudo ip tuntap add dev tap0 mode tap
-sudo ip addr add 192.168.1.2/24 dev tap0
-sudo ip link set dev tap0 up
-sudo sysctl -w net.ipv4.conf.tap0.proxy_arp=1
-
-# Start the VM
 sudo `which firecracker` --no-api --config-file ./vmconfig.json
+```
 
-# Ping
+Now the host can already ping the `lan` bridge.
+```sh
 ping 192.168.1.1
 ssh root@192.168.1.1 ping 192.168.1.2
+```
 
-# Kill the VM
+To stop the VM, you use `reboot` inside or `kill` outside.
+```sh
 sudo killall firecracker
+```
+
+## DHCP for eth1 / wan
+
+To get the VM's `wan` interface up, again in a separate shell, start the host's DHCP server for the guest. The `-d` option enables debug mode, so dnsmasq prints the incoming DHCP requests. If you want the VM to have Internet access, you'd also need to enable forwarding and possibly NAT/masquerading separately.
+```sh
+sudo dnsmasq -d --bind-dynamic --listen-address=192.168.123.1 --dhcp-range=192.168.123.10,192.168.123.100
+```
+
+## Multiple VMs
+
+Each VM needs its own TAP interfaces and `vmconfig.json` file.
+
+If you want to run multiple VMs with a bridge connecting their TAP interfaces, you'd need to enable ARP proxying so the VMs can see each other via the host.
+```sh
+sudo sysctl net.ipv4.conf.tap0.proxy_arp=1 # optional
 ```

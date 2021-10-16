@@ -16,6 +16,11 @@
       "iface_id": "eth0",
       "guest_mac": "02:fc:00:00:00:05",
       "host_dev_name": "tap0"
+    },
+    {
+      "iface_id": "eth1",
+      "guest_mac": "02:fc:00:00:00:06",
+      "host_dev_name": "tap1"
     }
   ],
   "machine-config": {
