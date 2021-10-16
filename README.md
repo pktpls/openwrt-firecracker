@@ -64,3 +64,27 @@ If you want to run multiple VMs with a bridge connecting their TAP interfaces, y
 ```sh
 sudo sysctl net.ipv4.conf.tap0.proxy_arp=1 # optional
 ```
+
+## VLAN
+
+Because TAP interfaces carry Ethernet frames (while TUN interfaces carry IP packets), many convenient things just work, including VLANs.
+
+On the host:
+```sh
+sudo ip link add link tap0 name tap0.foo type vlan id 42
+sudo ip addr add 10.42.0.2/24 dev tap0.foo
+sudo ip link set tap0.foo up
+```
+
+In the VM:
+```sh
+ip link add link tap0 name tap0.foo type vlan id 42
+ip addr add 10.42.0.2/24 dev tap0.foo
+ip link set tap0.foo up
+```
+
+Et voila:
+```sh
+ping 10.42.0.1
+ssh root@10.42.0.1 ping 10.42.0.2
+```
