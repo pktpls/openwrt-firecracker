@@ -78,9 +78,9 @@ sudo ip link set tap0.foo up
 
 In the VM:
 ```sh
-ip link add link tap0 name tap0.foo type vlan id 42
-ip addr add 10.42.0.2/24 dev tap0.foo
-ip link set tap0.foo up
+ip link add link eth0 name eth0.foo type vlan id 42
+ip addr add 10.42.0.1/24 dev eth0.foo
+ip link set eth0.foo up
 ```
 
 Et voila:
