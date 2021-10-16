@@ -1,13 +1,13 @@
 
 # OpenWrt as a Firecracker MicroVM
 
-- Boots in less than 4-6 seconds. There are number of large sleeps in the OpenWrt boot process that can probably be avoided in a VM (no actual hardware to wait for).
+- Boots in less than 4-6 seconds. There are a number of large sleeps in the OpenWrt boot process that can probably be avoided in a VM (no actual hardware to wait for).
 - Works with OpenWrt snapshots and not with OpenWrt 21.02, because the kernel needs to have `CONFIG_VIRTIO_MMIO_CMDLINE_DEVICES` enabled, which was added in October 2021.
 - Reboot and shutdown are wonky in Firecracker VMs. `poweroff` will halt the guest system but not exit the VM itself, `reboot` will exit the VM as you'd expect from `poweroff`. From the host's side, you can simply kill the Firecracker process for a non-graceful shutdown.
 
 ## Basic usage
 
-OpenWrt automatically uses `eth0` for the `lan` bridge and `eth1` for `wan`/`wan6`. If the `eth` doesn't exist, it will simply skipped and only the `lan` bridge created.
+OpenWrt automatically uses `eth0` for the `lan` bridge and `eth1` for `wan`/`wan6`. If the latter doesn't exist, it will simply skipped and only the `lan` bridge created.
 
 Get the kernel and rootfs images.
 ```sh
