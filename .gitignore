@@ -1,0 +1,4 @@
+bzImage
+extract-vmlinux.sh
+rootfs.img
+vmlinux.elf
