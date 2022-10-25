@@ -1,4 +1,8 @@
 
+> This repository has been archived - find the latest version at https://github.com/pktpls/notes/tree/main/openwrt-firecracker
+
+---
+
 # OpenWrt as a Firecracker MicroVM
 
 - Boots in less than 4-6 seconds. There are a number of large sleeps in the OpenWrt boot process that can probably be avoided in a VM (no actual hardware to wait for).
